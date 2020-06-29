@@ -1,5 +1,7 @@
 import Web3 from "web3";
-import metaCoinArtifact from "../../build/contracts/MetaCoin.json";
+import voting_artifacts from "../../build/contracts/Voting.json";
+
+let candidates = {"李宇春": "candidate-1", "周笔畅": "candidate-2", "张靓颖": "candidate-3"}
 
 const App = {
   web3: null,
@@ -12,9 +14,9 @@ const App = {
     try {
       // get contract instance
       const networkId = await web3.eth.net.getId();
-      const deployedNetwork = metaCoinArtifact.networks[networkId];
+      const deployedNetwork = voting_artifacts.networks[networkId];
       this.meta = new web3.eth.Contract(
-        metaCoinArtifact.abi,
+        voting_artifacts.abi,
         deployedNetwork.address,
       );
 
@@ -22,37 +24,33 @@ const App = {
       const accounts = await web3.eth.getAccounts();
       this.account = accounts[0];
 
-      this.refreshBalance();
+ 
+      this.loadCurrentVoting();
     } catch (error) {
       console.error("Could not connect to contract or chain.");
     }
   },
 
-  refreshBalance: async function() {
-    const { getBalance } = this.meta.methods;
-    const balance = await getBalance(this.account).call();
+  loadCurrentVoting: async function (){
 
-    const balanceElement = document.getElementsByClassName("balance")[0];
-    balanceElement.innerHTML = balance;
+    let candidateNames = Object.keys(candidates);
+    const { totalVotesFor } = this.meta.methods;
+
+    for (var i = 0; i < candidateNames.length; i++) {
+      let name = candidateNames[i];
+      const v = await totalVotesFor(this.web3.utils.utf8ToHex(name)).call();
+      $("#" + candidates[name]).html(v.toString());
+    }
   },
 
-  sendCoin: async function() {
-    const amount = parseInt(document.getElementById("amount").value);
-    const receiver = document.getElementById("receiver").value;
+  voteAction: async function (){
+    let name= $("#candidate").val()
+    const { voteForCandidate } = this.meta.methods;
+    await voteForCandidate(this.web3.utils.utf8ToHex(name)).send({ from: this.account });
 
-    this.setStatus("Initiating transaction... (please wait)");
-
-    const { sendCoin } = this.meta.methods;
-    await sendCoin(receiver, amount).send({ from: this.account });
-
-    this.setStatus("Transaction complete!");
-    this.refreshBalance();
+    this.loadCurrentVoting();
   },
-
-  setStatus: function(message) {
-    const status = document.getElementById("status");
-    status.innerHTML = message;
-  },
+ 
 };
 
 window.App = App;
